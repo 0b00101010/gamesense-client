@@ -3,8 +3,8 @@
 
 
 <!-- PROJECT SHIELDS -->
-[![version](https://img.shields.io/badge/Release-2.2.5-green.svg)](https://github.com/IUDevman/gamesense-client/releases/latest)
-[![version](https://img.shields.io/badge/Dev-2.2.6-orange.svg)](https://github.com/IUDevman/gamesense-client/releases/latest)
+[![version](https://img.shields.io/badge/Release-2.2.6-green.svg)](https://github.com/IUDevman/gamesense-client/releases/latest)
+[![version](https://img.shields.io/badge/Dev-2.2.7-orange.svg)](https://github.com/IUDevman/gamesense-client/releases/latest)
 [![discord](https://img.shields.io/badge/Discord-xfgPw63-8080c0)](https://discord.gg/xfgPw63)
 ![build](https://github.com/IUDevman/gamesense-master/workflows/Java%20CI%20with%20Gradle/badge.svg)
 ![GitHub All Releases](https://img.shields.io/github/downloads/IUDevman/gamesense-client/total)
@@ -51,7 +51,8 @@ Most notable features:
 * GL_DONT_CARE (Viewmodel Transformations)
 * NekoPvP (First commit, Item FOV)
 * TechAle (AutoAnvil, PistonCrystal, Blocker)
-* 0b00101010 (HoleESP rewrite)
+* 0b00101010 (HoleESP rewrite, misc render)
+* A2H (Bug fixes, compatability)
 
 #### Credits
 ***Check specific class files for full credits.***
