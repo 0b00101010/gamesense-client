@@ -48,6 +48,8 @@ public class EventProcessor {
 	public void onTick(TickEvent.ClientTickEvent event) {
 		if (mc.player != null) {
 			ModuleManager.onUpdate();
+			// needed for AutoCrystal
+			GameSense.EVENT_BUS.post(event);
 		}
 	}
 
