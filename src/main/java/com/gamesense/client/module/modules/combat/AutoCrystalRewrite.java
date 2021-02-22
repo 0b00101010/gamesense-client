@@ -45,7 +45,6 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraftforge.event.entity.EntityJoinWorldEvent;
-import net.minecraftforge.fml.common.gameevent.TickEvent;
 
 import java.util.*;
 import java.util.concurrent.*;
@@ -171,15 +170,8 @@ public class AutoCrystalRewrite extends Module {
     private final ExecutorService mainExecutor = Executors.newSingleThreadExecutor();
     private Future<CrystalInfo> mainThreadOutput;
 
-    private long globalTimeoutTime;
-
-    @EventHandler
-    private final Listener<TickEvent.ClientTickEvent> onPreUpdate = new Listener<>(event -> {
-        if (event.phase == TickEvent.Phase.END) {
-            return;
-        }
-        mainThreadOutput = null;
-
+    @Override
+    public void onUpdate() {
         if (mc.player == null || mc.world == null || mc.player.isDead) {
             disable();
             return;
@@ -195,54 +187,11 @@ public class AutoCrystalRewrite extends Module {
 
         ROTATION_UTIL.shouldSpoofAngles(spoofRotations.getValue());
 
-        // entity range is the range from each crystal
-        // so adding these together should solve problem
-        // and reduce searching time
-        double enemyDistance = enemyRange.getValue() + placeRange.getValue();
-        final double entityRangeSq = (enemyDistance) * (enemyDistance);
-        List<EntityPlayer> targets = mc.world.playerEntities.stream()
-                .filter(entity -> mc.player.getDistanceSq(entity) <= entityRangeSq)
-                .filter(entity -> !EntityUtil.basicChecksEntity(entity))
-                .filter(entity -> entity.getHealth() > 0.0f)
-                .collect(Collectors.toList());
-        // no point continuing if there are no targets
-        if (targets.size() == 0) {
-            return;
-        }
+        doCA();
+        setupCA();
+    }
 
-         List<EntityEnderCrystal> allCrystals = mc.world.loadedEntityList.stream()
-                .filter(entity -> entity instanceof EntityEnderCrystal)
-                .map(entity -> (EntityEnderCrystal) entity).collect(Collectors.toList());
-
-        final boolean own = breakMode.getValue().equalsIgnoreCase("Own");
-        if (own) {
-            // remove own crystals that have been destroyed
-            allCrystals.removeIf(crystal -> !placedCrystals.containsKey(EntityUtil.getPosition(crystal)));
-            placedCrystals.values().removeIf(crystal -> {
-                if (crystal == null) {
-                    return false;
-                }
-                return crystal.isDead;
-            });
-        }
-
-        List<BlockPos> blocks = CrystalUtil.findCrystalBlocks((float) placeRange.getValue(), endCrystalMode.getValue());
-        CASettings settings = new CASettings(breakCrystal.getValue(), placeCrystal.getValue(), enemyRange.getValue(), breakRange.getValue(), wallsRange.getValue(), minDmg.getValue(), minBreakDmg.getValue(), minFacePlaceDmg.getValue(), maxSelfDmg.getValue(), breakThreads.getValue(), facePlaceValue.getValue(), antiSuicide.getValue(), breakMode.getValue(), crystalPriority.getValue(), mc.player.getPositionVector());
-        List<PlayerInfo> targetsInfo = new ArrayList<>();
-        for (EntityPlayer target : targets) {
-            targetsInfo.add(new PlayerInfo(target));
-        }
-
-        globalTimeoutTime = System.currentTimeMillis() + timeout.getValue();
-        mainThreadOutput = mainExecutor.submit(new CAMain(settings, targetsInfo, allCrystals, blocks, globalTimeoutTime));
-    });
-
-    @EventHandler
-    private final Listener<TickEvent.ClientTickEvent> onPostUpdate = new Listener<>(event -> {
-        if (event.phase == TickEvent.Phase.START) {
-            return;
-        }
-
+    private void doCA() {
         if (mainThreadOutput == null) {
             return;
         }
@@ -250,11 +199,10 @@ public class AutoCrystalRewrite extends Module {
         while (!(mainThreadOutput.isDone() || mainThreadOutput.isCancelled())) {
         }
 
-        CrystalInfo output;
+        CrystalInfo output = null;
         try {
             output = mainThreadOutput.get();
-        } catch (InterruptedException | ExecutionException e) {
-            return;
+        } catch (InterruptedException | ExecutionException ignored) {
         }
 
         if (output == null) {
@@ -265,21 +213,21 @@ public class AutoCrystalRewrite extends Module {
             CrystalInfo.BreakInfo breakInfo = (CrystalInfo.BreakInfo) output;
             if (antiWeakness.getValue() && mc.player.isPotionActive(MobEffects.WEAKNESS)) {
                 if (!isAttacking) {
-                        // save initial player hand
-                        oldSlot = mc.player.inventory.currentItem;
-                        isAttacking = true;
-                    }
-                    // search for sword and tools in hotbar
-                    int newSlot = InventoryUtil.findFirstItemSlot(ItemSword.class, 0, 8);
-                    if (newSlot == -1) {
-                        InventoryUtil.findFirstItemSlot(ItemTool.class, 0, 8);
-                    }
-                    // check if any swords or tools were found
-                    if (newSlot != -1) {
-                        mc.player.inventory.currentItem = newSlot;
-                        switchCooldown = true;
-                    }
+                    // save initial player hand
+                    oldSlot = mc.player.inventory.currentItem;
+                    isAttacking = true;
                 }
+                // search for sword and tools in hotbar
+                int newSlot = InventoryUtil.findFirstItemSlot(ItemSword.class, 0, 8);
+                if (newSlot == -1) {
+                    InventoryUtil.findFirstItemSlot(ItemTool.class, 0, 8);
+                }
+                // check if any swords or tools were found
+                if (newSlot != -1) {
+                    mc.player.inventory.currentItem = newSlot;
+                    switchCooldown = true;
+                }
+            }
 
             if (timer.getTimePassed() / 50L >= 20 - attackSpeed.getValue()) {
                 timer.reset();
@@ -393,7 +341,55 @@ public class AutoCrystalRewrite extends Module {
                 }
             }
         }
-    });
+    }
+
+    private void setupCA() {
+        if (mainThreadOutput != null) {
+            mainThreadOutput.cancel(true);
+            mainThreadOutput = null;
+        }
+
+        // entity range is the range from each crystal
+        // so adding these together should solve problem
+        // and reduce searching time
+        double enemyDistance = enemyRange.getValue() + placeRange.getValue();
+        final double entityRangeSq = (enemyDistance) * (enemyDistance);
+        List<EntityPlayer> targets = mc.world.playerEntities.stream()
+                .filter(entity -> mc.player.getDistanceSq(entity) <= entityRangeSq)
+                .filter(entity -> !EntityUtil.basicChecksEntity(entity))
+                .filter(entity -> entity.getHealth() > 0.0f)
+                .collect(Collectors.toList());
+        // no point continuing if there are no targets
+        if (targets.size() == 0) {
+            return;
+        }
+
+        List<EntityEnderCrystal> allCrystals = mc.world.loadedEntityList.stream()
+                .filter(entity -> entity instanceof EntityEnderCrystal)
+                .map(entity -> (EntityEnderCrystal) entity).collect(Collectors.toList());
+
+        final boolean own = breakMode.getValue().equalsIgnoreCase("Own");
+        if (own) {
+            // remove own crystals that have been destroyed
+            allCrystals.removeIf(crystal -> !placedCrystals.containsKey(EntityUtil.getPosition(crystal)));
+            placedCrystals.values().removeIf(crystal -> {
+                if (crystal == null) {
+                    return false;
+                }
+                return crystal.isDead;
+            });
+        }
+
+        List<BlockPos> blocks = CrystalUtil.findCrystalBlocks((float) placeRange.getValue(), endCrystalMode.getValue());
+        CASettings settings = new CASettings(breakCrystal.getValue(), placeCrystal.getValue(), enemyRange.getValue(), breakRange.getValue(), wallsRange.getValue(), minDmg.getValue(), minBreakDmg.getValue(), minFacePlaceDmg.getValue(), maxSelfDmg.getValue(), breakThreads.getValue(), facePlaceValue.getValue(), antiSuicide.getValue(), breakMode.getValue(), crystalPriority.getValue(), mc.player.getPositionVector());
+        List<PlayerInfo> targetsInfo = new ArrayList<>();
+        for (EntityPlayer target : targets) {
+            targetsInfo.add(new PlayerInfo(target));
+        }
+
+        long timeoutTime = System.currentTimeMillis() + timeout.getValue();
+        mainThreadOutput = mainExecutor.submit(new CAMain(settings, targetsInfo, allCrystals, blocks, timeoutTime));
+    }
 
     public void onWorldRender(RenderEvent event) {
         if (this.render != null) {
