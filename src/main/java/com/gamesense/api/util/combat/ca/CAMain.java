@@ -43,7 +43,7 @@ public class CAMain implements Callable<CrystalInfo> {
         List<Future<CrystalInfo.PlaceInfo>> placeFutures = null;
         List<Future<List<CrystalInfo.BreakInfo>>> breakFutures = null;
         if (settings.breakCrystals) {
-            breakFutures = startBreakThreads(targets, settings);
+            breakFutures = startBreakThreads(targets, crystals, settings);
         }
         if (settings.placeCrystals) {
             placeFutures = startPlaceThreads(targets, settings);
@@ -66,19 +66,7 @@ public class CAMain implements Callable<CrystalInfo> {
         return null;
     }
 
-    private List<Future<List<CrystalInfo.BreakInfo>>> startBreakThreads(List<PlayerInfo> targets, CASettings settings) {
-        List<EntityEnderCrystal> crystalList = crystals.stream()
-                .filter(entity -> mc.player.getDistanceSq(entity) <= settings.breakRangeSq)
-                .collect(Collectors.toList());
-        // remove all crystals that deal more than max self damage
-        // no point in checking these
-        final float playerHealth = mc.player.getHealth() + mc.player.getAbsorptionAmount();
-        crystalList.removeIf(crystal -> {
-            float damage = DamageUtil.calculateDamage(crystal.posX, crystal.posY, crystal.posZ, mc.player);
-            if (damage > settings.maxSelfDamage) {
-                return true;
-            } else return settings.antiSuicide && damage > playerHealth;
-        });
+    private List<Future<List<CrystalInfo.BreakInfo>>> startBreakThreads(List<PlayerInfo> targets, List<EntityEnderCrystal> crystalList, CASettings settings) {
         if (crystalList.size() == 0) {
             return null;
         }

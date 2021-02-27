@@ -1,5 +1,7 @@
 package com.gamesense.client.module.modules.combat;
 
+import com.gamesense.api.event.Phase;
+import com.gamesense.api.event.events.OnUpdateWalkingPlayerEvent;
 import com.gamesense.api.event.events.PacketEvent;
 import com.gamesense.api.event.events.RenderEvent;
 import com.gamesense.api.setting.Setting;
@@ -9,13 +11,15 @@ import com.gamesense.api.util.combat.ca.CAMain;
 import com.gamesense.api.util.combat.ca.CASettings;
 import com.gamesense.api.util.combat.ca.CrystalInfo;
 import com.gamesense.api.util.combat.ca.PlayerInfo;
+import com.gamesense.api.util.math.RotationUtils;
 import com.gamesense.api.util.misc.MessageBus;
 import com.gamesense.api.util.misc.Timer;
 import com.gamesense.api.util.player.InventoryUtil;
+import com.gamesense.api.util.player.PlayerPacket;
 import com.gamesense.api.util.render.GSColor;
 import com.gamesense.api.util.render.RenderUtil;
 import com.gamesense.api.util.world.EntityUtil;
-import com.gamesense.client.GameSense;
+import com.gamesense.client.manager.managers.PlayerPacketManager;
 import com.gamesense.client.module.Module;
 import com.gamesense.client.module.ModuleManager;
 import com.gamesense.client.module.modules.gui.ColorMain;
@@ -43,6 +47,7 @@ import net.minecraft.util.EnumHand;
 import net.minecraft.util.SoundCategory;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.RayTraceResult;
+import net.minecraft.util.math.Vec2f;
 import net.minecraft.util.math.Vec3d;
 import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 
@@ -64,7 +69,6 @@ public class AutoCrystalRewrite extends Module {
     Setting.Boolean autoSwitch;
     Setting.Boolean raytrace;
     Setting.Boolean rotate;
-    Setting.Boolean spoofRotations;
     Setting.Boolean chat;
     Setting.Boolean showDamage;
     Setting.Boolean antiSuicide;
@@ -140,7 +144,6 @@ public class AutoCrystalRewrite extends Module {
         facePlaceValue = registerInteger("FacePlace HP", 8, 0, 36);
         minFacePlaceDmg = registerDouble("FacePlace Dmg", 2.0, 1, 10);
         rotate = registerBoolean("Rotate", true);
-        spoofRotations = registerBoolean("Spoof Angles", true);
         raytrace = registerBoolean("Raytrace", false);
         showDamage = registerBoolean("Render Dmg", true);
         showOwn = registerBoolean("Debug Own", false);
@@ -160,6 +163,9 @@ public class AutoCrystalRewrite extends Module {
     private Entity renderEntity;
     private BlockPos render;
     Timer timer = new Timer();
+
+    private Vec3d lastHitVec = Vec3d.ZERO;
+    private boolean rotating = false;
 
     // stores all the locations we have attempted to place crystals
     // and the corresponding crystal for that location (if there is any)
@@ -184,8 +190,6 @@ public class AutoCrystalRewrite extends Module {
         if (antiSuicide.getValue() && (mc.player.getHealth() + mc.player.getAbsorptionAmount()) <= antiSuicideValue.getValue()) {
             return;
         }
-
-        ROTATION_UTIL.shouldSpoofAngles(spoofRotations.getValue());
 
         doCA();
         setupCA();
@@ -232,9 +236,8 @@ public class AutoCrystalRewrite extends Module {
             if (timer.getTimePassed() / 50L >= 20 - attackSpeed.getValue()) {
                 timer.reset();
 
-                if (rotate.getValue()) {
-                    ROTATION_UTIL.lookAtPacket(breakInfo.crystal.posX, breakInfo.crystal.posY, breakInfo.crystal.posZ, mc.player);
-                }
+                rotating = rotate.getValue();
+                lastHitVec = breakInfo.crystal.getPositionVector();
 
                 if (breakType.getValue().equalsIgnoreCase("Swing")) {
                     mc.playerController.attackEntity(mc.player, breakInfo.crystal);
@@ -246,7 +249,7 @@ public class AutoCrystalRewrite extends Module {
             }
             return;
         } else {
-            ROTATION_UTIL.resetRotation();
+            rotating = false;
             if (oldSlot != -1) {
                 mc.player.inventory.currentItem = oldSlot;
                 oldSlot = -1;
@@ -287,9 +290,8 @@ public class AutoCrystalRewrite extends Module {
                 return;
             }
 
-            if (rotate.getValue()) {
-                ROTATION_UTIL.lookAtPacket((double) placeInfo.crystal.getX() + 0.5d, (double) placeInfo.crystal.getY() - 0.5d, (double) placeInfo.crystal.getZ() + 0.5d, mc.player);
-            }
+            rotating = rotate.getValue();
+            lastHitVec = new Vec3d(placeInfo.crystal).add(0.5, 0.5, 0.5);
 
             EnumFacing enumFacing = null;
             if (raytrace.getValue()) {
@@ -380,6 +382,18 @@ public class AutoCrystalRewrite extends Module {
             });
         }
 
+        // remove all crystals that deal more than max self damage
+        // no point in checking these
+        final boolean antiSuicideValue = antiSuicide.getValue();
+        final float maxSelfDamage = (float) maxSelfDmg.getValue();
+        final float playerHealth = mc.player.getHealth() + mc.player.getAbsorptionAmount();
+        allCrystals.removeIf(crystal -> {
+            float damage = DamageUtil.calculateDamage(crystal.posX, crystal.posY, crystal.posZ, mc.player);
+            if (damage > maxSelfDamage) {
+                return true;
+            } else return antiSuicideValue && damage > playerHealth;
+        });
+
         List<BlockPos> blocks = CrystalUtil.findCrystalBlocks((float) placeRange.getValue(), endCrystalMode.getValue());
         CASettings settings = new CASettings(breakCrystal.getValue(), placeCrystal.getValue(), enemyRange.getValue(), breakRange.getValue(), wallsRange.getValue(), minDmg.getValue(), minBreakDmg.getValue(), minFacePlaceDmg.getValue(), maxSelfDmg.getValue(), breakThreads.getValue(), facePlaceValue.getValue(), antiSuicide.getValue(), breakMode.getValue(), crystalPriority.getValue(), mc.player.getPositionVector());
         List<PlayerInfo> targetsInfo = new ArrayList<>();
@@ -421,6 +435,16 @@ public class AutoCrystalRewrite extends Module {
         }
     }
 
+    @SuppressWarnings("unused")
+    @EventHandler
+    private final Listener<OnUpdateWalkingPlayerEvent> onUpdateWalkingPlayerEventListener = new Listener<>(event -> {
+        if (event.getPhase() != Phase.PRE || !rotating) return;
+
+        Vec2f rotation = RotationUtils.getRotationTo(lastHitVec);
+        PlayerPacket packet = new PlayerPacket(this, rotation);
+        PlayerPacketManager.INSTANCE.addPacket(packet);
+    });
+
     @EventHandler
     private final Listener<PacketEvent.Receive> packetReceiveListener = new Listener<>(event -> {
         Packet<?> packet = event.getPacket();
@@ -454,7 +478,6 @@ public class AutoCrystalRewrite extends Module {
 
     public void onEnable() {
         ROTATION_UTIL.onEnable();
-        GameSense.EVENT_BUS.subscribe(this);
 
         if(chat.getValue() && mc.player != null) {
             MessageBus.sendClientPrefixMessage(ColorMain.getEnabledColor() + "AutoCrystal turned ON!");
@@ -463,10 +486,9 @@ public class AutoCrystalRewrite extends Module {
 
     public void onDisable() {
         ROTATION_UTIL.onDisable();
-        GameSense.EVENT_BUS.unsubscribe(this);
         render = null;
         renderEntity = null;
-        ROTATION_UTIL.resetRotation();
+        rotating = false;
 
         placedCrystals.clear();
 
