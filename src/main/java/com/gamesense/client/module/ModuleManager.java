@@ -39,6 +39,7 @@ public class ModuleManager {
         addMod(new AutoWeb());
         addMod(new BedAura());
         addMod(new Blocker());
+        addMod(new CevBreaker());
         addMod(new FastBow());
         addMod(new HoleFill());
         addMod(new KillAura());
@@ -48,7 +49,6 @@ public class ModuleManager {
         addMod(new SelfWeb());
         addMod(new Surround());
         //Exploits
-        addMod(new CoordExploit());
         addMod(new FastBreak());
         addMod(new LiquidInteract());
         addMod(new NoInteract());
@@ -111,10 +111,12 @@ public class ModuleManager {
         addMod(new ArmorHUD());
         addMod(new ArrayListModule());
         addMod(new CombatInfo());
+        addMod(new Coordinates());
         addMod(new InventoryViewer());
         addMod(new Notifications());
         addMod(new PotionEffects());
         addMod(new Radar());
+        addMod(new Speedometer());
         addMod(new TabGUIModule());
         addMod(new TargetHUD());
         addMod(new TargetInfo());
