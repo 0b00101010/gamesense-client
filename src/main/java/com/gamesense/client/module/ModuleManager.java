@@ -87,6 +87,7 @@ public class ModuleManager {
         addMod(new PhysicsSpammer());
         addMod(new PvPInfo());
         addMod(new SortInventory());
+        addMod(new XCarry());
         //Render
         addMod(new BlockHighlight());
         addMod(new BreakESP());
@@ -111,12 +112,12 @@ public class ModuleManager {
         addMod(new ArmorHUD());
         addMod(new ArrayListModule());
         addMod(new CombatInfo());
-        addMod(new CoordinateHud());
+        addMod(new Coordinates());
         addMod(new InventoryViewer());
         addMod(new Notifications());
         addMod(new PotionEffects());
         addMod(new Radar());
-        addMod(new SpeedHud());
+        addMod(new Speedometer());
         addMod(new TabGUIModule());
         addMod(new TargetHUD());
         addMod(new TargetInfo());
@@ -182,7 +183,7 @@ public class ModuleManager {
         return modulesClassMap.values();
     }
 
-    public static ArrayList<Module> getModulesInCategory(Module.Category category) {
+    public static ArrayList<Module> getModulesInCategory(Category category) {
         ArrayList<Module> list = new ArrayList<>();
 
         for (Module module : modulesClassMap.values()) {
