@@ -1,10 +1,10 @@
 <!-- PROJECT TITLE -->
-![logo](https://github.com/IUDevman/gamesense-client/blob/master/src/main/resources/assets/gamesense/gamesense.png)
+![logo](https://github.com/IUDevman/gamesense-assets/blob/main/images/new/logo_large.png)
 
 
 <!-- PROJECT SHIELDS -->
-[![version](https://img.shields.io/badge/Release-2.2.8-green.svg)](https://github.com/IUDevman/gamesense-client/releases/latest)
-[![version](https://img.shields.io/badge/Dev-2.3.0-orange.svg)](https://github.com/IUDevman/gamesense-client/releases/latest)
+[![version](https://img.shields.io/badge/Release-2.3.0-green.svg)](https://github.com/IUDevman/gamesense-client/releases/latest)
+[![version](https://img.shields.io/badge/Dev-2.3.1-orange.svg)](https://github.com/IUDevman/gamesense-client/releases/latest)
 [![discord](https://img.shields.io/badge/Discord-xfgPw63-8080c0)](https://discord.gg/xfgPw63)
 ![build](https://github.com/IUDevman/gamesense-master/workflows/Java%20CI%20with%20Gradle/badge.svg)
 ![GitHub All Releases](https://img.shields.io/github/downloads/IUDevman/gamesense-client/total)
@@ -53,7 +53,9 @@ Most notable features:
 * TechAle (AutoAnvil, PistonCrystal, Blocker)
 * 0b00101010 (HoleESP rewrite, misc render)
 * A2H (Bug fixes, compatability)
-* Xiaro (Code improvement, compatability)
+* Xiaro (Code improvement, compatability, Rotation Manager)
+* Soulbond (XCarry)
+* Lyneez (NoFall)
 
 #### Credits
 ***Check specific class files for full credits.***
